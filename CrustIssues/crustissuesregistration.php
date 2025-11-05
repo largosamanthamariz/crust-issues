@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $full_name = trim($_POST['fname'] ?? '');
   $username  = trim($_POST['username'] ?? '');
   $address   = trim($_POST['address'] ?? '');
+  $phone     = trim($_POST['phone'] ?? '');
   $email     = trim($_POST['email'] ?? '');
   $password  = $_POST['password'] ?? '';
   $confirm   = $_POST['confirm'] ?? '';
@@ -16,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // Validation
   if ($password !== $confirm) {
     $error = 'Passwords do not match.';
-  } elseif (!$full_name || !$username || !$address || !$email || !$password) {
+  } elseif (!$full_name || !$username || !$address || !$phone || !$email || !$password) {
     $error = 'All fields are required.';
   } else {
     // Check for existing username/email
@@ -25,13 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($check->fetchColumn() > 0) {
       $error = 'Username or email already exists.';
     } else {
-      // ✅ Create new user with full_name and address
+      // ✅ Create new user with full_name, address, and phone
       $hash = password_hash($password, PASSWORD_DEFAULT);
       $stmt = $pdo->prepare("
-        INSERT INTO users (full_name, username, email, address, password_hash, role)
-        VALUES (?, ?, ?, ?, ?, 'user')
+        INSERT INTO users (full_name, username, email, address, phone, password_hash, role)
+        VALUES (?, ?, ?, ?, ?, ?, 'user')
       ");
-      $stmt->execute([$full_name, $username, $email, $address, $hash]);
+      $stmt->execute([$full_name, $username, $email, $address, $phone, $hash]);
       $message = 'Account created successfully! You can now log in.';
     }
   }
@@ -76,6 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label for="address">ADDRESS</label>
         <input type="text" name="address" id="address" placeholder="Enter delivery address" 
                value="<?= htmlspecialchars($_POST['address'] ?? '') ?>" required>
+
+        <label for="phone">PHONE NUMBER</label>
+        <input type="tel" name="phone" id="phone" placeholder="Enter phone number" 
+               value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
 
         <label for="email">EMAIL</label>
         <input type="email" name="email" id="email" placeholder="Enter email" 

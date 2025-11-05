@@ -6,34 +6,30 @@ require __DIR__ . '/../includes/auth.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  // Accept either username or email
   $username = trim($_POST['username'] ?? '');
-  $email    = trim($_POST['email'] ?? '');
   $password = $_POST['password'] ?? '';
 
-  $identity = $username !== '' ? $username : $email;
-
-  if ($identity === '' || $password === '') {
-    $error = 'Please enter your username or email, and your password.';
+  if ($username === '' || $password === '') {
+    $error = 'Please enter your username and password.';
   } else {
-    // Look up by username OR email
+    // Look up by username only
     $stmt = $pdo->prepare("
       SELECT id, username, email, password_hash, role
       FROM users
-      WHERE username = :id OR email = :id
+      WHERE username = :username
       LIMIT 1
     ");
-    $stmt->execute([':id' => $identity]);
+    $stmt->execute([':username' => $username]);
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user['password_hash'])) {
       login_user($user);
 
-      // ✅ Redirect to your Crust Issues home page after login
+      // ✅ Redirect to Crust Issues home page
       header('Location: crustissueshome.php');
       exit;
     } else {
-      $error = 'Invalid credentials.';
+      $error = 'Invalid username or password.';
     }
   }
 }
@@ -49,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="stylesheet" href="styles.css">
   <style>
     .error { color:#b00020; margin-bottom:12px; font-weight:600; }
-    .hint  { font-size:12px; opacity:.8; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -68,19 +63,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <form action="" method="post" novalidate>
         <label for="username">USERNAME</label>
         <input type="text" name="username" id="usern" placeholder="Enter username" 
-               value="<?= htmlspecialchars($_POST['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-
-        <label for="email">EMAIL</label>
-        <input type="email" name="email" id="email" placeholder="Enter email" 
-               value="<?= htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-        <div class="hint">Use either username <i>or</i> email</div>
+               value="<?= htmlspecialchars($_POST['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
 
         <label for="password">PASSWORD</label>
         <input type="password" name="password" id="password" placeholder="Enter password" required>
-
-        <!-- Confirm field ignored for login -->
-        <label for="confirm">CONFIRM PASSWORD</label>
-        <input type="password" id="confirm" placeholder="(Not required for login)">
 
         <button type="submit" class="btn">LOGIN</button>
       </form>
