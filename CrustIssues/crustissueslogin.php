@@ -1,5 +1,4 @@
 <?php
-// Go up one folder to reach the includes directory
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/auth.php';
 
@@ -12,7 +11,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($username === '' || $password === '') {
     $error = 'Please enter your username and password.';
   } else {
-    // Look up by username only
     $stmt = $pdo->prepare("
       SELECT id, username, email, password_hash, role
       FROM users
@@ -25,8 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($user && password_verify($password, $user['password_hash'])) {
       login_user($user);
 
-      // ✅ Redirect to Crust Issues home page
-      header('Location: crustissueshome.php');
+      // 🔀 Role-based redirect
+      if (($user['role'] ?? 'user') === 'admin') {
+        header('Location: Admin/dashboard.php'); // admin goes to dashboard
+      } else {
+        header('Location: crustissueshome.php'); // normal users to home
+      }
       exit;
     } else {
       $error = 'Invalid username or password.';
@@ -43,18 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
-  <style>
-    .error { color:#b00020; margin-bottom:12px; font-weight:600; }
-  </style>
+  <style>.error{color:#b00020;margin-bottom:12px;font-weight:600}</style>
 </head>
 <body>
   <div class="container auth">
-
-    <!-- Left side: form -->
     <div class="form-section">
-      <div class="title">
-        <img src="signin.png" alt="Sign In Title">
-      </div>
+      <div class="title"><img src="signin.png" alt="Sign In Title"></div>
 
       <?php if ($error): ?>
         <div class="error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
@@ -62,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <form action="" method="post" novalidate>
         <label for="username">USERNAME</label>
-        <input type="text" name="username" id="usern" placeholder="Enter username" 
+        <input type="text" name="username" id="usern" placeholder="Enter username"
                value="<?= htmlspecialchars($_POST['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
 
         <label for="password">PASSWORD</label>
@@ -72,14 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </form>
     </div>
 
-    <!-- Right side: welcome text -->
     <div class="welcome-section">
       <img src="logopink.png" alt="Logo">
       <h2>Welcome Back!</h2>
       <p>We offer people best way<br> to eat best pastries.</p>
       <p class="small">Don't have an account yet?</p>
       <a href="crustissuesregistration.php" class="btn">SIGN UP</a>
-
       <div class="social-login">
         <p>Or sign in with</p>
         <div class="icons">
@@ -89,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
     </div>
-
   </div>
 </body>
 </html>
