@@ -1,29 +1,54 @@
 <?php
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/auth.php';
-require_role('user'); // remove if cart should work without login
+
+// Require login; remove this line if cart should be usable without login
+require_role('user');
 
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrf = $_SESSION['csrf_token'];
+
 $cart = $_SESSION['cart'] ?? [];
 $items = [];
 $subtotal = 0.0;
 
 if ($cart) {
-  $ids = implode(',', array_map('intval', array_keys($cart)));
-  $stmt = $pdo->query("SELECT id, name, price, image FROM products WHERE id IN ($ids)");
+  // Build a safe prepared IN(...) list
+  $ids = array_map('intval', array_keys($cart));
+  $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+  $stmt = $pdo->prepare("SELECT id, name, price, image FROM products WHERE id IN ($placeholders)");
+  $stmt->execute($ids);
+
+  $found = [];
   while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $id  = (int)$row['id'];
-    $qty = (int)($cart[$id] ?? 0);
-    $lineTotal = $qty * (float)$row['price'];
+    $found[$id] = true;
+
+    $qty = max(0, (int)($cart[$id] ?? 0));
+    if ($qty === 0) continue;
+
+    $price = (float)$row['price'];
+    $lineTotal = $qty * $price;
     $subtotal += $lineTotal;
+
     $items[] = [
-      'id' => $id,
-      'name' => $row['name'] ?? ("Product #$id"),
-      'price' => (float)$row['price'],
-      'qty' => $qty,
-      'line' => $lineTotal,
-      'image' => $row['image'] ?? 'pictures/placeholder.jpg',
+      'id'    => $id,
+      'name'  => $row['name'] ?: ("Product #$id"),
+      'price' => $price,
+      'qty'   => $qty,
+      'line'  => $lineTotal,
+      'image' => $row['image'] ?: 'pictures/placeholder.jpg',
     ];
+  }
+
+  // If some IDs in session no longer exist in DB, ignore them gracefully
+  foreach ($cart as $id => $_qty) {
+    if (!isset($found[(int)$id])) {
+      // Optionally, unset from cart:
+      // unset($_SESSION['cart'][(int)$id]);
+    }
   }
 }
 
@@ -42,7 +67,6 @@ function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <style>
-    /* Cart-specific light styles that sit on top of your theme */
     .page-title{font-family:'Inter',sans-serif;font-weight:800;font-size:clamp(28px,5vw,48px);text-align:center;margin:26px 0;color:var(--text)}
     .page-title .accent{color:var(--accent)}
     .cart-wrap{max-width:980px;margin:0 auto 50px;padding:0 10px}
@@ -108,28 +132,33 @@ function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
                   <div class="qtybox">
                     <!-- minus -->
                     <form action="update_cart.php" method="post">
-                      <input type="hidden" name="id" value="<?= $it['id'] ?>">
-                      <input type="hidden" name="qty" value="<?= max(0,$it['qty']-1) ?>">
+                      <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+                      <input type="hidden" name="id" value="<?= (int)$it['id'] ?>">
+                      <input type="hidden" name="qty" value="<?= max(0, (int)$it['qty'] - 1) ?>">
                       <button type="submit">−</button>
                     </form>
 
+                    <!-- direct qty input -->
                     <form action="update_cart.php" method="post" style="display:inline;">
-                      <input type="hidden" name="id" value="<?= $it['id'] ?>">
-                      <input type="number" name="qty" value="<?= $it['qty'] ?>" min="0" onChange="this.form.submit()">
+                      <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+                      <input type="hidden" name="id" value="<?= (int)$it['id'] ?>">
+                      <input type="number" name="qty" value="<?= (int)$it['qty'] ?>" min="0" onChange="this.form.submit()">
                     </form>
 
                     <!-- plus -->
                     <form action="update_cart.php" method="post">
-                      <input type="hidden" name="id" value="<?= $it['id'] ?>">
-                      <input type="hidden" name="qty" value="<?= $it['qty']+1 ?>">
+                      <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+                      <input type="hidden" name="id" value="<?= (int)$it['id'] ?>">
+                      <input type="hidden" name="qty" value="<?= (int)$it['qty'] + 1 ?>">
                       <button type="submit">+</button>
                     </form>
                   </div>
                 </td>
-                <td><strong>P<?= number_format($it['line'], 0) ?></strong></td>
+                <td><strong>P<?= number_format($it['line'], 2) ?></strong></td>
                 <td>
                   <form action="remove_from_cart.php" method="post">
-                    <input type="hidden" name="id" value="<?= $it['id'] ?>">
+                    <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
+                    <input type="hidden" name="id" value="<?= (int)$it['id'] ?>">
                     <button class="remove-btn" title="Remove" aria-label="Remove">🗑️</button>
                   </form>
                 </td>
@@ -144,7 +173,10 @@ function e($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
             <div class="summary-row"><span>Sub Total</span><span>P<?= number_format($subtotal, 2) ?></span></div>
             <div class="summary-row"><span>Discount (10%)</span><span>-P<?= number_format($discount, 2) ?></span></div>
             <div class="summary-row total"><span>Total</span><span>P<?= number_format($total, 2) ?></span></div>
-            <form class="checkout" action="checkout.php" method="post">
+
+            <!-- Checkout -->
+            <form class="checkout" action="crustissuescheckout.php" method="post">
+              <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
               <button class="btn" type="submit">Checkout Now</button>
             </form>
           </div>

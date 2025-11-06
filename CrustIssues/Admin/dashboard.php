@@ -1,8 +1,7 @@
 <?php
 // Crust Issues — Admin Dashboard
-require __DIR__ . '/../../includes/db.php';
+require __DIR__ . '/../../includes/db.php'; 
 require __DIR__ . '/../../includes/auth.php';
-
 
 // Require admin
 $user = current_user();
@@ -13,32 +12,14 @@ if (!$user || ($user['role'] ?? '') !== 'admin') {
 
 // ---- KPIs (safe queries with fallbacks) ----
 function kpi($pdo, $sql, $params = []) {
-  try {
-    $st = $pdo->prepare($sql);
-    $st->execute($params);
-    return (int)$st->fetchColumn();
-  } catch (Throwable $e) {
-    return 0;
-  }
+  try { $st = $pdo->prepare($sql); $st->execute($params); return (int)$st->fetchColumn(); }
+  catch (Throwable $e) { return 0; }
 }
 
-// total users
-$totalUsers = kpi($pdo, "SELECT COUNT(*) FROM users");
-
-// new users today (if no created_at column, will fallback to 0)
-$newUsers = kpi($pdo, "SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()");
-
-// “active users” = users who placed an order in last 30 days (adjust as you like)
-$activeUsers = kpi($pdo, "
-  SELECT COUNT(DISTINCT o.user_id)
-  FROM orders o
-  WHERE o.created_at >= (CURRENT_DATE - INTERVAL 30 DAY)
-");
-
-// new orders today
-$newOrders = kpi($pdo, "SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()");
-
-// total orders
+$totalUsers  = kpi($pdo, "SELECT COUNT(*) FROM users");
+$newUsers    = kpi($pdo, "SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()");
+$activeUsers = kpi($pdo, "SELECT COUNT(DISTINCT o.user_id) FROM orders o WHERE o.created_at >= (CURRENT_DATE - INTERVAL 30 DAY)");
+$newOrders   = kpi($pdo, "SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURDATE()");
 $totalOrders = kpi($pdo, "SELECT COUNT(*) FROM orders");
 ?>
 <!DOCTYPE html>
@@ -47,12 +28,8 @@ $totalOrders = kpi($pdo, "SELECT COUNT(*) FROM orders");
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Crust Issues — Admin</title>
-
-  <!-- Fonts & Icons -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-  <!-- Use your site palette/vars -->
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -65,10 +42,11 @@ $totalOrders = kpi($pdo, "SELECT COUNT(*) FROM orders");
       </div>
 
       <nav class="nav">
-        <a href="./dashboard.php" style="background:#db7b7b"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="./dashboard.php" class="active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
         <a href="./orders.php"><i class="fa-regular fa-clipboard"></i> Orders</a>
         <a href="./users.php"><i class="fa-regular fa-user"></i> Reg Users</a>
-        <a href="./menu.php"><i class="fa-solid fa-utensils"></i> Menu</a>
+        <!-- 👇 Menu now goes to products_new.php -->
+        <a href="./products_new.php"><i class="fa-solid fa-utensils"></i> Menu</a>
       </nav>
 
       <a class="logout" href="../logout.php"><i class="fa-solid fa-right-from-bracket"></i> LOGOUT</a>
@@ -81,38 +59,17 @@ $totalOrders = kpi($pdo, "SELECT COUNT(*) FROM orders");
       <section class="panel">
         <h2 class="panel-title">DASHBOARD</h2>
         <div class="kpis">
-          <div class="kpi">
-            <span class="chip">New Users</span>
-            <span class="value"><?= $newUsers ?></span>
-            <div class="sub">new users</div>
-          </div>
-          <div class="kpi">
-            <span class="chip">Active Users</span>
-            <span class="value"><?= $activeUsers ?></span>
-            <div class="sub">active users (30d)</div>
-          </div>
-          <div class="kpi">
-            <span class="chip">Total Users</span>
-            <span class="value"><?= $totalUsers ?></span>
-            <div class="sub">total users</div>
-          </div>
+          <div class="kpi"><span class="chip">New Users</span><span class="value"><?= $newUsers ?></span><div class="sub">new users</div></div>
+          <div class="kpi"><span class="chip">Active Users</span><span class="value"><?= $activeUsers ?></span><div class="sub">active users (30d)</div></div>
+          <div class="kpi"><span class="chip">Total Users</span><span class="value"><?= $totalUsers ?></span><div class="sub">total users</div></div>
         </div>
       </section>
 
       <section class="panel">
         <h2 class="panel-title">ORDERS</h2>
         <div class="orders">
-          <div class="kpi">
-            <span class="chip">New Orders</span>
-            <span class="value"><?= $newOrders ?></span>
-            <div class="sub">new orders today</div>
-          </div>
-          <div class="kpi">
-            <span class="chip">Total Orders</span>
-            <span class="value"><?= $totalOrders ?></span>
-            <div class="sub">total orders</div>
-          </div>
-          <!-- “Confirmed Orders” intentionally removed -->
+          <div class="kpi"><span class="chip">New Orders</span><span class="value"><?= $newOrders ?></span><div class="sub">new orders today</div></div>
+          <div class="kpi"><span class="chip">Total Orders</span><span class="value"><?= $totalOrders ?></span><div class="sub">total orders</div></div>
         </div>
       </section>
     </main>
